@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Математический калькулятор</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --text: var(--tg-theme-text-color, #000000);
+    --hint: var(--tg-theme-hint-color, #999);
+    --btn: var(--tg-theme-button-color, #3390ec);
+    --btn-text: var(--tg-theme-button-text-color, #fff);
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    margin: 0; padding: 16px;
+  }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .tab {
+    padding: 6px 10px; font-size: 13px; border-radius: 8px;
+    background: var(--hint); color: var(--bg); cursor: pointer; border: none;
+  }
+  .tab.active { background: var(--btn); color: var(--btn-text); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  label { display: block; margin: 10px 0 4px; font-size: 14px; color: var(--hint); }
+  input, select {
+    width: 100%; padding: 10px; border-radius: 8px;
+    border: 1px solid var(--hint); background: var(--bg); color: var(--text);
+    font-size: 15px;
+  }
+  button.calc {
+    width: 100%; margin-top: 14px; padding: 12px;
+    background: var(--btn); color: var(--btn-text);
+    border: none; border-radius: 10px; font-size: 16px; font-weight: 600;
+  }
+  .result {
+    margin-top: 16px; padding: 14px; border-radius: 10px;
+    background: rgba(0,0,0,0.05); font-size: 18px; word-break: break-all;
+    min-height: 24px;
+  }
+  .hint { font-size: 12px; color: var(--hint); margin-top: 6px; }
+</style>
+</head>
+<body>
+  <h1>🧮 Математический калькулятор</h1>
+
+  <div class="tabs">
+    <button class="tab active" data-panel="basic">Базовые</button>
+    <button class="tab" data-panel="power">Степени и корни</button>
+    <button class="tab" data-panel="log">Логарифмы</button>
+    <button class="tab" data-panel="trig">Тригонометрия</button>
+    <button class="tab" data-panel="invtrig">Обратные триг.</button>
+    <button class="tab" data-panel="stats">Статистика</button>
+  </div>
+
+  <!-- БАЗОВЫЕ -->
+  <div class="panel active" id="basic">
+    <label>Операция</label>
+    <select id="basicOp">
+      <option value="+">Сумма (a + b)</option>
+      <option value="-">Разность (a − b)</option>
+      <option value="*">Произведение (a × b)</option>
+      <option value="/">Деление (a ÷ b)</option>
+      <option value="%">Процент от числа (% от a)</option>
+      <option value="abs">Модуль |a|</option>
+      <option value="square">Квадрат a²</option>
+    </select>
+    <label>Число A</label><input type="number" id="basicA" step="any">
+    <label>Число B (если нужно)</label><input type="number" id="basicB" step="any">
+    <button class="calc" onclick="calcBasic()">Посчитать</button>
+    <div class="result" id="basicRes">—</div>
+  </div>
+
+  <!-- СТЕПЕНИ И КОРНИ -->
+  <div class="panel" id="power">
+    <label>Операция</label>
+    <select id="powOp">
+      <option value="sqrt">√a — квадратный корень</option>
+      <option value="nroot">ⁿ√a — корень n-й степени</option>
+      <option value="pow">aᵇ — возведение в степень</option>
+    </select>
+    <label>Число A</label><input type="number" id="powA" step="any">
+    <label>Степень / n (если нужно)</label><input type="number" id="powB" step="any">
+    <button class="calc" onclick="calcPow()">Посчитать</button>
+    <div class="result" id="powRes">—</div>
+  </div>
+
+  <!-- ЛОГАРИФМЫ -->
+  <div class="panel" id="log">
+    <label>Операция</label>
+    <select id="logOp">
+      <option value="ln">ln(a) — натуральный</option>
+      <option value="log10">log₁₀(a) — десятичный</option>
+      <option value="log2">log₂(a)</option>
+      <option value="log">log по основанию b</option>
+    </select>
+    <label>Число A</label><input type="number" id="logA" step="any">
+    <label>Основание (если нужно)</label><input type="number" id="logB" step="any">
+    <button class="calc" onclick="calcLog()">Посчитать</button>
+    <div class="result" id="logRes">—</div>
+  </div>
+
+  <!-- ТРИГОНОМЕТРИЯ -->
+  <div class="panel" id="trig">
+    <label>Функция</label>
+    <select id="trigFn">
+      <option value="sin">sin</option>
+      <option value="cos">cos</option>
+      <option value="tan">tan (tg)</option>
+      <option value="cot">cot (ctg)</option>
+    </select>
+    <label>Единицы</label>
+    <select id="trigUnit">
+      <option value="deg">Градусы</option>
+      <option value="rad">Радианы</option>
+    </select>
+    <label>Угол</label><input type="number" id="trigVal" step="any">
+    <button class="calc" onclick="calcTrig()">Посчитать</button>
+    <div class="result" id="trigRes">—</div>
+  </div>
+
+  <!-- ОБРАТНЫЕ ТРИГ. -->
+  <div class="panel" id="invtrig">
+    <label>Функция</label>
+    <select id="invFn">
+      <option value="asin">arcsin</option>
+      <option value="acos">arccos</option>
+      <option value="atan">arctan</option>
+      <option value="acot">arccot</option>
+    </select>
+    <label>Вывод</label>
+    <select id="invUnit">
+      <option value="deg">В градусах</option>
+      <option value="rad">В радианах</option>
+    </select>
+    <label>Значение</label><input type="number" id="invVal" step="any">
+    <button class="calc" onclick="calcInv()">Посчитать</button>
+    <div class="result" id="invRes">—</div>
+  </div>
+
+  <!-- СТАТИСТИКА -->
+  <div class="panel" id="stats">
+    <label>Метрика</label>
+    <select id="statFn">
+      <option value="mean">Среднее арифметическое</option>
+      <option value="expect">Математическое ожидание (= среднее)</option>
+      <option value="variance">Дисперсия</option>
+      <option value="median">Медиана</option>
+      <option value="mode">Мода</option>
+    </select>
+    <label>Числа через запятую или пробел</label>
+    <input type="text" id="statArr" placeholder="1 2 3 4 5 5">
+    <div class="hint">Пример: 1, 2, 3, 4, 5, 5</div>
+    <button class="calc" onclick="calcStat()">Посчитать</button>
+    <div class="result" id="statRes">—</div>
+  </div>
+
+<script>
+  Telegram.WebApp.ready();
+  Telegram.WebApp.expand();
+
+  // Переключение вкладок
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById(t.dataset.panel).classList.add('active');
+    });
+  });
+
+  function fmt(x) {
+    if (!isFinite(x)) return 'Ошибка (деление на 0 или недопустимое значение)';
+    if (Number.isNaN(x)) return 'Ошибка: некорректные данные';
+    return +x.toFixed(10);
+  }
+
+  // ===== Базовые =====
+  function calcBasic() {
+    const op = document.getElementById('basicOp').value;
+    const a = parseFloat(document.getElementById('basicA').value);
+    const b = parseFloat(document.getElementById('basicB').value);
+    let r;
+    switch (op) {
+      case '+': r = a + b; break;
+      case '-': r = a - b; break;
+      case '*': r = a * b; break;
+      case '/': r = a / b; break;
+      case '%': r = a * b / 100; break; // b% от a
+      case 'abs': r = Math.abs(a); break;
+      case 'square': r = a * a; break;
+    }
+    document.getElementById('basicRes').textContent = fmt(r);
+  }
+
+  // ===== Степени и корни =====
+  function calcPow() {
+    const op = document.getElementById('powOp').value;
+    const a = parseFloat(document.getElementById('powA').value);
+    const b = parseFloat(document.getElementById('powB').value);
+    let r;
+    switch (op) {
+      case 'sqrt': r = Math.sqrt(a); break;
+      case 'nroot': r = Math.pow(a, 1 / b); break;
+      case 'pow':  r = Math.pow(a, b); break;
+    }
+    document.getElementById('powRes').textContent = fmt(r);
+  }
+
+  // ===== Логарифмы =====
+  function calcLog() {
+    const op = document.getElementById('logOp').value;
+    const a = parseFloat(document.getElementById('logA').value);
+    const b = parseFloat(document.getElementById('logB').value);
+    let r;
+    switch (op) {
+      case 'ln':    r = Math.log(a); break;
+      case 'log10': r = Math.log10(a); break;
+      case 'log2':  r = Math.log2(a); break;
+      case 'log':   r = Math.log(a) / Math.log(b); break;
+    }
+    document.getElementById('logRes').textContent = fmt(r);
+  }
+
+  // ===== Тригонометрия =====
+  function calcTrig() {
+    const fn = document.getElementById('trigFn').value;
+    const unit = document.getElementById('trigUnit').value;
+    let v = parseFloat(document.getElementById('trigVal').value);
+    if (unit === 'deg') v = v * Math.PI / 180;
+    let r;
+    switch (fn) {
+      case 'sin': r = Math.sin(v); break;
+      case 'cos': r = Math.cos(v); break;
+      case 'tan': r = Math.tan(v); break;
+      case 'cot': r = 1 / Math.tan(v); break;
+    }
+    document.getElementById('trigRes').textContent = fmt(r);
+  }
+
+  // ===== Обратные тригонометрические =====
+  function calcInv() {
+    const fn = document.getElementById('invFn').value;
+    const unit = document.getElementById('invUnit').value;
+    const v = parseFloat(document.getElementById('invVal').value);
+    let r;
+    switch (fn) {
+      case 'asin': r = Math.asin(v); break;
+      case 'acos': r = Math.acos(v); break;
+      case 'atan': r = Math.atan(v); break;
+      case 'acot': r = Math.atan(1 / v); break; // arccot(x) = arctan(1/x)
+    }
+    if (unit === 'deg') r = r * 180 / Math.PI;
+    document.getElementById('invRes').textContent = fmt(r);
+  }
+
+  // ===== Статистика =====
+  function calcStat() {
+    const fn = document.getElementById('statFn').value;
+    const arr = document.getElementById('statArr').value
+      .split(/[,\s]+/).map(s => parseFloat(s)).filter(n => !isNaN(n));
+    if (arr.length === 0) {
+      document.getElementById('statRes').textContent = 'Введите числа';
+      return;
+    }
+    let r;
+    const mean = arr.reduce((s, x) => s + x, 0) / arr.length;
+    switch (fn) {
+      case 'mean':
+      case 'expect':
+        r = mean; break;
+      case 'variance':
+        r = arr.reduce((s, x) => s + Math.pow(x - mean, 2), 0) / arr.length;
+        break;
+      case 'median':
+        const sorted = [...arr].sort((a, b) => a - b);
+        const m = sorted.length / 2;
+        r = sorted.length % 2 ? sorted[Math.floor(m)] : (sorted[m - 1] + sorted[m]) / 2;
+        break;
+      case 'mode':
+        const freq = {};
+        arr.forEach(x => freq[x] = (freq[x] || 0) + 1);
+        const maxF = Math.max(...Object.values(freq));
+        r = Object.keys(freq).filter(k => freq[k] === maxF).join(', ');
+        document.getElementById('statRes').textContent = r;
+        return;
+    }
+    document.getElementById('statRes').textContent = fmt(r);
+  }
+</script>
+</body>
+</html>
