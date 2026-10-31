@@ -45,6 +45,31 @@
     min-height: 24px;
   }
   .hint { font-size: 12px; color: var(--hint); margin-top: 6px; }
+
+  /* Стили для графиков */
+  #graphCanvas {
+    width: 100%;
+    height: 400px;
+    border: 1px solid var(--hint);
+    border-radius: 8px;
+    margin-top: 12px;
+    background: var(--bg);
+    touch-action: none;
+  }
+  .graph-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .graph-controls label {
+    margin: 0;
+    font-size: 13px;
+  }
+  .graph-controls input {
+    padding: 8px;
+    font-size: 14px;
+  }
 </style>
 </head>
 <body>
@@ -57,6 +82,7 @@
     <button class="tab" data-panel="trig">Тригонометрия</button>
     <button class="tab" data-panel="invtrig">Обратные триг.</button>
     <button class="tab" data-panel="stats">Статистика</button>
+    <button class="tab" data-panel="graphs">📊 Графики</button>
   </div>
 
   <!-- БАЗОВЫЕ -->
@@ -161,6 +187,50 @@
     <div class="result" id="statRes">—</div>
   </div>
 
+  <!-- ГРАФИКИ -->
+  <div class="panel" id="graphs">
+    <label>Тип функции</label>
+    <select id="graphType" onchange="updateGraphInputs()">
+      <option value="linear">Прямая: y = kx + b</option>
+      <option value="parabola">Парабола: y = ax² + bx + c</option>
+      <option value="hyperbola">Гипербола: y = k/x</option>
+      <option value="cubic">Кубическая: y = ax³</option>
+      <option value="sqrt">Корень: y = √x</option>
+      <option value="log">Логарифм: y = log_a(x)</option>
+      <option value="exp">Показательная: y = aˣ</option>
+      <option value="sin">Синус: y = sin(x)</option>
+      <option value="cos">Косинус: y = cos(x)</option>
+      <option value="tan">Тангенс: y = tan(x)</option>
+      <option value="cot">Котангенс: y = cot(x)</option>
+      <option value="circle">Окружность: (x-a)² + (y-b)² = r²</option>
+    </select>
+
+    <div id="graphParams"></div>
+
+    <div class="graph-controls">
+      <div>
+        <label>Смещение по X (dx)</label>
+        <input type="number" id="shiftX" value="0" step="0.5">
+      </div>
+      <div>
+        <label>Смещение по Y (dy)</label>
+        <input type="number" id="shiftY" value="0" step="0.5">
+      </div>
+      <div>
+        <label>Масштаб X</label>
+        <input type="number" id="scaleX" value="1" step="0.1" min="0.1">
+      </div>
+      <div>
+        <label>Масштаб Y</label>
+        <input type="number" id="scaleY" value="1" step="0.1" min="0.1">
+      </div>
+    </div>
+
+    <button class="calc" onclick="drawGraph()">Построить график</button>
+    <canvas id="graphCanvas"></canvas>
+    <div class="hint" id="graphFormula">—</div>
+  </div>
+
 <script>
   Telegram.WebApp.ready();
   Telegram.WebApp.expand();
@@ -192,7 +262,7 @@
       case '-': r = a - b; break;
       case '*': r = a * b; break;
       case '/': r = a / b; break;
-      case '%': r = a * b / 100; break; // b% от a
+      case '%': r = a * b / 100; break;
       case 'abs': r = Math.abs(a); break;
       case 'square': r = a * a; break;
     }
@@ -254,7 +324,7 @@
       case 'asin': r = Math.asin(v); break;
       case 'acos': r = Math.acos(v); break;
       case 'atan': r = Math.atan(v); break;
-      case 'acot': r = Math.atan(1 / v); break; // arccot(x) = arctan(1/x)
+      case 'acot': r = Math.atan(1 / v); break;
     }
     if (unit === 'deg') r = r * 180 / Math.PI;
     document.getElementById('invRes').textContent = fmt(r);
@@ -293,6 +363,316 @@
     }
     document.getElementById('statRes').textContent = fmt(r);
   }
+
+  // ===== ГРАФИКИ =====
+  let canvas, ctx;
+  let graphData = {
+    type: 'linear',
+    params: {},
+    shiftX: 0,
+    shiftY: 0,
+    scaleX: 1,
+    scaleY: 1
+  };
+
+  // Инициализация canvas
+  function initCanvas() {
+    canvas = document.getElementById('graphCanvas');
+    ctx = canvas.getContext('2d');
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+  }
+
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * window.devicePixelRatio;
+    canvas.height = rect.height * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  }
+
+  // Обновление полей ввода в зависимости от типа функции
+  function updateGraphInputs() {
+    const type = document.getElementById('graphType').value;
+    const container = document.getElementById('graphParams');
+    let html = '';
+
+    switch (type) {
+      case 'linear':
+        html = `
+          <div class="graph-controls">
+            <div><label>k (наклон)</label><input type="number" id="param1" value="1" step="0.1"></div>
+            <div><label>b (сдвиг)</label><input type="number" id="param2" value="0" step="0.1"></div>
+          </div>`;
+        break;
+      case 'parabola':
+        html = `
+          <div class="graph-controls">
+            <div><label>a</label><input type="number" id="param1" value="1" step="0.1"></div>
+            <div><label>b</label><input type="number" id="param2" value="0" step="0.1"></div>
+            <div><label>c</label><input type="number" id="param3" value="0" step="0.1"></div>
+          </div>`;
+        break;
+      case 'hyperbola':
+        html = `<div class="graph-controls"><div><label>k</label><input type="number" id="param1" value="1" step="0.1"></div></div>`;
+        break;
+      case 'cubic':
+        html = `<div class="graph-controls"><div><label>a</label><input type="number" id="param1" value="1" step="0.1"></div></div>`;
+        break;
+      case 'sqrt':
+        html = `<div class="hint">y = √x (определена при x ≥ 0)</div>`;
+        break;
+      case 'log':
+        html = `<div class="graph-controls"><div><label>Основание a</label><input type="number" id="param1" value="10" step="0.1" min="0.1"></div></div>`;
+        break;
+      case 'exp':
+        html = `<div class="graph-controls"><div><label>Основание a</label><input type="number" id="param1" value="2" step="0.1" min="0.1"></div></div>`;
+        break;
+      case 'sin':
+      case 'cos':
+      case 'tan':
+      case 'cot':
+        html = `
+          <div class="graph-controls">
+            <div><label>Амплитуда A</label><input type="number" id="param1" value="1" step="0.1"></div>
+            <div><label>Частота ω</label><input type="number" id="param2" value="1" step="0.1"></div>
+          </div>`;
+        break;
+      case 'circle':
+        html = `
+          <div class="graph-controls">
+            <div><label>Центр X (a)</label><input type="number" id="param1" value="0" step="0.5"></div>
+            <div><label>Центр Y (b)</label><input type="number" id="param2" value="0" step="0.5"></div>
+            <div><label>Радиус r</label><input type="number" id="param3" value="2" step="0.1" min="0.1"></div>
+          </div>`;
+        break;
+    }
+
+    container.innerHTML = html;
+  }
+
+  // Вычисление значения функции
+  function calcFunction(x, type, params) {
+    switch (type) {
+      case 'linear':
+        return params.k * x + params.b;
+      case 'parabola':
+        return params.a * x * x + params.b * x + params.c;
+      case 'hyperbola':
+        return x === 0 ? NaN : params.k / x;
+      case 'cubic':
+        return params.a * x * x * x;
+      case 'sqrt':
+        return x < 0 ? NaN : Math.sqrt(x);
+      case 'log':
+        return x <= 0 ? NaN : Math.log(x) / Math.log(params.a);
+      case 'exp':
+        return Math.pow(params.a, x);
+      case 'sin':
+        return params.A * Math.sin(params.omega * x);
+      case 'cos':
+        return params.A * Math.cos(params.omega * x);
+      case 'tan':
+        const tanVal = Math.tan(params.omega * x);
+        return Math.abs(tanVal) > 100 ? NaN : params.A * tanVal;
+      case 'cot':
+        const cotVal = 1 / Math.tan(params.omega * x);
+        return Math.abs(cotVal) > 100 ? NaN : params.A * cotVal;
+      default:
+        return 0;
+    }
+  }
+
+  // Рисование графика
+  function drawGraph() {
+    if (!canvas) initCanvas();
+
+    const type = document.getElementById('graphType').value;
+    const shiftX = parseFloat(document.getElementById('shiftX').value) || 0;
+    const shiftY = parseFloat(document.getElementById('shiftY').value) || 0;
+    const scaleX = parseFloat(document.getElementById('scaleX').value) || 1;
+    const scaleY = parseFloat(document.getElementById('scaleY').value) || 1;
+
+    // Собираем параметры
+    const params = {};
+    switch (type) {
+      case 'linear':
+        params.k = parseFloat(document.getElementById('param1').value) || 1;
+        params.b = parseFloat(document.getElementById('param2').value) || 0;
+        break;
+      case 'parabola':
+        params.a = parseFloat(document.getElementById('param1').value) || 1;
+        params.b = parseFloat(document.getElementById('param2').value) || 0;
+        params.c = parseFloat(document.getElementById('param3').value) || 0;
+        break;
+      case 'hyperbola':
+      case 'cubic':
+      case 'log':
+      case 'exp':
+        params.k = parseFloat(document.getElementById('param1').value) || 1;
+        params.a = parseFloat(document.getElementById('param1').value) || 1;
+        break;
+      case 'sin':
+      case 'cos':
+      case 'tan':
+      case 'cot':
+        params.A = parseFloat(document.getElementById('param1').value) || 1;
+        params.omega = parseFloat(document.getElementById('param2').value) || 1;
+        break;
+      case 'circle':
+        params.cx = parseFloat(document.getElementById('param1').value) || 0;
+        params.cy = parseFloat(document.getElementById('param2').value) || 0;
+        params.r = parseFloat(document.getElementById('param3').value) || 2;
+        break;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
+
+    // Очистка canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Рисуем сетку и оси
+    drawGrid(width, height, scaleX, scaleY, shiftX, shiftY);
+
+    // Рисуем функцию
+    ctx.strokeStyle = '#3390ec';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+
+    if (type === 'circle') {
+      // Для окружности используем параметрическое уравнение
+      const centerX = (params.cx + shiftX) * scaleX * (width / 10) + width / 2;
+      const centerY = height / 2 - (params.cy + shiftY) * scaleY * (height / 10);
+      const radiusX = params.r * scaleX * (width / 10);
+      const radiusY = params.r * scaleY * (height / 10);
+
+      ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
+      ctx.stroke();
+    } else {
+      // Для остальных функций рисуем по точкам
+      let firstPoint = true;
+      const xRange = 10 / scaleX;
+
+      for (let px = 0; px < width; px++) {
+        const x = (px - width / 2) / (width / 10) / scaleX - shiftX;
+        const y = calcFunction(x, type, params);
+
+        if (!isNaN(y) && isFinite(y)) {
+          const screenX = px;
+          const screenY = height / 2 - (y + shiftY) * scaleY * (height / 10);
+
+          if (firstPoint) {
+            ctx.moveTo(screenX, screenY);
+            firstPoint = false;
+          } else {
+            ctx.lineTo(screenX, screenY);
+          }
+        } else {
+          firstPoint = true;
+        }
+      }
+      ctx.stroke();
+    }
+
+    // Формула
+    updateFormula(type, params, shiftX, shiftY);
+  }
+
+  // Рисование сетки
+  function drawGrid(width, height, scaleX, scaleY, shiftX, shiftY) {
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+    ctx.lineWidth = 1;
+
+    const centerX = width / 2 + shiftX * scaleX * (width / 10);
+    const centerY = height / 2 - shiftY * scaleY * (height / 10);
+
+    // Вертикальные линии
+    const stepX = (width / 10) * scaleX;
+    for (let i = -10; i <= 10; i++) {
+      const x = centerX + i * stepX;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+
+    // Горизонтальные линии
+    const stepY = (height / 10) * scaleY;
+    for (let i = -10; i <= 10; i++) {
+      const y = centerY + i * stepY;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+
+    // Оси координат
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 2;
+
+    // Ось X
+    ctx.beginPath();
+    ctx.moveTo(0, centerY);
+    ctx.lineTo(width, centerY);
+    ctx.stroke();
+
+    // Ось Y
+    ctx.beginPath();
+    ctx.moveTo(centerX, 0);
+    ctx.lineTo(centerX, height);
+    ctx.stroke();
+  }
+
+  // Обновление формулы
+  function updateFormula(type, params, shiftX, shiftY) {
+    let formula = '';
+    const shift = shiftX !== 0 || shiftY !== 0 ? ` (смещение: dx=${shiftX}, dy=${shiftY})` : '';
+
+    switch (type) {
+      case 'linear':
+        formula = `y = ${params.k}x + ${params.b}${shift}`;
+        break;
+      case 'parabola':
+        formula = `y = ${params.a}x² + ${params.b}x + ${params.c}${shift}`;
+        break;
+      case 'hyperbola':
+        formula = `y = ${params.k}/x${shift}`;
+        break;
+      case 'cubic':
+        formula = `y = ${params.a}x³${shift}`;
+        break;
+      case 'sqrt':
+        formula = `y = √x${shift}`;
+        break;
+      case 'log':
+        formula = `y = log_${params.a}(x)${shift}`;
+        break;
+      case 'exp':
+        formula = `y = ${params.a}ˣ${shift}`;
+        break;
+      case 'sin':
+        formula = `y = ${params.A}·sin(${params.omega}x)${shift}`;
+        break;
+      case 'cos':
+        formula = `y = ${params.A}·cos(${params.omega}x)${shift}`;
+        break;
+      case 'tan':
+        formula = `y = ${params.A}·tan(${params.omega}x)${shift}`;
+        break;
+      case 'cot':
+        formula = `y = ${params.A}·cot(${params.omega}x)${shift}`;
+        break;
+      case 'circle':
+        formula = `(x-${params.cx})² + (y-${params.cy})² = ${params.r}²${shift}`;
+        break;
+    }
+
+    document.getElementById('graphFormula').textContent = formula;
+  }
+
+  // Инициализация при загрузке
+  updateGraphInputs();
 </script>
 </body>
 </html>
